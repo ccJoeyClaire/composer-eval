@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "composer-agentic-eval"
+version = "0.1.0"
+description = "End-to-end eval harness for composer-agentic-rag (gold → infer → RAGChecker)."
+requires-python = ">=3.10"
+dependencies = [
+    "composer-agentic-rag",
+    "python-dotenv>=1.0.1",
+    "ragchecker>=0.1.9",
+    "pandas>=2.0.0",
+]
+
+[tool.uv.sources]
+composer-agentic-rag = { path = "../composer-agentic_rag", editable = true }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["eval*"]
+
+# Pylance/Pyright: sibling editable deps are not visible to static analysis unless
+# listed here. Keep extraPaths in sync with [tool.uv.sources] path values.
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+extraPaths = ["../composer-agentic_rag"]

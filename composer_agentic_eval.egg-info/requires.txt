@@ -1,0 +1,4 @@
+composer-agentic-rag
+python-dotenv>=1.0.1
+ragchecker>=0.1.9
+pandas>=2.0.0
