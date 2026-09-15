@@ -1,4 +1,4 @@
-"""End-to-end eval harness: qa_export → gold → infer → RAGChecker input."""
+"""End-to-end eval harness: qa_export → gold → infer → extract → RAGChecker score."""
 
 from __future__ import annotations
 
@@ -96,13 +96,22 @@ def run_extract(runners: list[EvalRunner], gold: list[GoldSample]) -> None:
         )
 
 
+def run_score(runners: list[EvalRunner]) -> None:
+    """RAGChecker input → overall / retriever / generator metrics."""
+    from eval.RAGChecker.run import run_checker_for_runner
+
+    for runner in runners:
+        runner_id = runner["runner_id"]
+        run_checker_for_runner(runner_id)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Eval harness pipeline")
     parser.add_argument(
         "--stage",
-        choices=("gold", "infer", "extract", "all"),
+        choices=("gold", "infer", "extract", "score", "all"),
         default="all",
-        help="Pipeline stage to run (default: all)",
+        help="Pipeline stage to run (default: all = gold+infer+extract; score is separate)",
     )
     parser.add_argument(
         "--gold",
@@ -114,6 +123,10 @@ def main() -> None:
     load_dotenv(_REPO_ROOT / ".env")
     os.environ.setdefault("RAG_CONFIG_PATH", str(RAG_CONFIG_PATH))
     ensure_data_dirs()
+
+    if args.stage == "score":
+        run_score(DEFAULT_RUNNERS)
+        return
 
     if args.stage in ("gold", "all"):
         run_gold(args.gold)

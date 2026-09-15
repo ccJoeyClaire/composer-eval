@@ -6,6 +6,9 @@ composer_agentic_eval.egg-info/dependency_links.txt
 composer_agentic_eval.egg-info/requires.txt
 composer_agentic_eval.egg-info/top_level.txt
 eval/base.py
+eval/RAGChecker/__init__.py
+eval/RAGChecker/__main__.py
+eval/RAGChecker/run.py
 eval/harness/__init__.py
 eval/harness/extract.py
 eval/harness/main.py

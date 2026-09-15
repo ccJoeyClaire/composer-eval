@@ -50,6 +50,21 @@ def ragchecker_input_path(runner_id: str) -> Path:
     return RAGCHECKER_DIR / runner_id / "input.json"
 
 
+def ragchecker_scores_path(runner_id: str) -> Path:
+    """Aggregate RAGChecker metrics for one runner arm."""
+    return RAGCHECKER_DIR / runner_id / "scores.json"
+
+
+def ragchecker_checking_output_path(runner_id: str) -> Path:
+    """Full RAGChecker dump (claims + checks) for one runner arm."""
+    return RAGCHECKER_DIR / runner_id / "checking_outputs.json"
+
+
+def ragchecker_llm_snapshot_path(runner_id: str) -> Path:
+    """Per-request LLM debug dump (content / reasoning / finish_reason)."""
+    return RAGCHECKER_DIR / runner_id / "llm_snapshots.jsonl"
+
+
 def ensure_data_dirs() -> None:
     """Create artifact directories if missing."""
     for path in (GOLD_DIR, INFER_DIR, RAGCHECKER_DIR):

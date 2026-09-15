@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-composer-agentic-rag = { path = "../composer-agentic_rag", editable = true }
+composer-agentic-rag = { path = "../AgenticRAG", editable = true }
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -26,4 +26,4 @@ include = ["eval*"]
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
-extraPaths = ["../composer-agentic_rag"]
+extraPaths = ["../AgenticRAG"]
