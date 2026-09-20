@@ -1,0 +1,962 @@
+[
+  {
+    "query_id": "query_001",
+    "user_question": "按照学习路线图，应该按什么顺序阅读这些文档？",
+    "gold_query": "学习路线图 推荐顺序 文档阅读顺序",
+    "gt_answer": "必须按以下顺序阅读：1. 06-术语翻译-小白版.md；2. 01-gateway-control-plane.md；3. 02-agent-execution-framework.md；4. 03-session-concurrency-framework.md；5. 04-tools-approval-security-framework.md；6. 05-lifecycle-reload-restart-shutdown-framework.md；7. 07-AI框架总原理.md；8. 08-上下文工程原理.md；9. 09-工具策略与安全原理.md；10. 10-模型回退与鲁棒性原理.md；11. 11-子智能体与技能系统原理.md；12. 12-AI优秀实现五件套-从原理到复刻.md；13. 13-AI记忆框架原理与实现.md；14. 14-AI-Hook与插件注入框架原理与实现.md；15. 15-多插件冲突治理与优先级规范实战.md；16. 16-上下文管理实现实战.md；17. 17-智能体执行状态机实现实战.md；18. 18-工具策略与审批状态机实现实战.md；19. 19-AI记忆系统状态机实现实战.md；20. 20-Hook插件注入状态机实现实战.md；21. 21-并发队列与Lane状态机实现实战.md。"
+  },
+  {
+    "query_id": "query_002",
+    "user_question": "怎么读这些文档最有效？",
+    "gold_query": "怎么读最有效 阅读方法 步骤一 步骤二 整体复盘",
+    "gt_answer": "最有效的阅读方法是：1. 每篇先看“步骤一”，先掌握真实调用顺序（谁先谁后）。2. 再看“步骤二”，重点看数据结构、关键参数、失败分支。3. 最后做整体复盘，确认关键保护逻辑已覆盖。"
+  },
+  {
+    "query_id": "query_003",
+    "user_question": "实现时的硬验收标准有哪些？",
+    "gold_query": "实现时的硬验收标准有哪些？",
+    "gt_answer": "1. 能跑通：`connect -> req(chat.send) -> agent reply -> event broadcast`。2. 同一 `sessionKey` 下两条消息不会乱序。3. `exec` 高风险命令能触发审批，超时有明确结果。4. 配置改动能区分“热更”与“重启”。5. 关停时客户端能收到 `shutdown`。6. 你能解释“为什么要 run/attempt/subscribe/fallback 四层分离”。7. 你能解释“为什么工具策略必须代码层约束而不是靠提示词”。8. 你能解释“为什么子智能体必须隔离会话并限制递归”。"
+  },
+  {
+    "query_id": "query_004",
+    "user_question": "硬验收标准中要求能解释哪些设计原因？",
+    "gold_query": "硬验收标准中要求能解释哪些设计原因？",
+    "gt_answer": "1. 为什么要 run/attempt/subscribe/fallback 四层分离。2. 为什么工具策略必须代码层约束而不是靠提示词。3. 为什么子智能体必须隔离会话并限制递归。"
+  },
+  {
+    "query_id": "query_005",
+    "user_question": "网关控制平面的执行链路包含哪些主要步骤？",
+    "gold_query": "网关控制平面 执行链路 步骤",
+    "gt_answer": "1. 网关入口：startGatewayServer(...) 启动全局依赖。2. 建运行态容器：createGatewayRuntimeState(...) 创建 http server / ws server、clients 集合、broadcast 函数、chat run 状态。3. 绑定 WS 入口：attachGatewayWsHandlers(...) -> attachGatewayWsConnectionHandler(...)。4. 握手阶段：message-handler.ts 要求先完成 connect.challenge + connect，并校验协议与 auth。5. 请求分发：普通 req 进入 handleGatewayRequest(...)。6. 权限校验：authorizeGatewayMethod(...) 按 role + scope 判断是否允许。7. 事件广播：createGatewayBroadcaster(...) 广播事件，并做事件级 scope 过滤和慢连接保护。"
+  },
+  {
+    "query_id": "query_006",
+    "user_question": "实现网关控制平面时，推荐的步骤顺序是什么？",
+    "gold_query": "网关控制平面 实现步骤 顺序",
+    "gt_answer": "1. 先实现 connect 握手，只允许握手成功后发业务请求。2. 再实现 authorize(method, role, scopes)。3. 再实现 dispatch(method, params)。4. 最后实现 broadcast(event, payload)，并加事件权限过滤。"
+  },
+  {
+    "query_id": "query_007",
+    "user_question": "握手为什么必须是第一包 connect？",
+    "gold_query": "握手必须是第一包 connect 的原因",
+    "gt_answer": "代码中 connect 作为首包约束，防止未认证请求直接打业务方法；失败直接拒绝，不进入 method 层。"
+  },
+  {
+    "query_id": "query_008",
+    "user_question": "method 分发是怎么做的？",
+    "gold_query": "method 分发的两层 handler 机制",
+    "gt_answer": "method 分发是两层 handler：extraHandlers（插件注入）优先，coreGatewayHandlers（内建）兜底；未命中返回 unknown method，不是静默忽略。"
+  },
+  {
+    "query_id": "query_009",
+    "user_question": "智能体执行框架中，run 和 attempt 分别负责什么？",
+    "gold_query": "智能体执行框架 run attempt 职责",
+    "gt_answer": "run 负责总调度，attempt 负责一次真实执行。"
+  },
+  {
+    "query_id": "query_010",
+    "user_question": "执行失败后，智能体执行框架如何处理？",
+    "gold_query": "智能体执行框架 执行失败 备选模型 回退",
+    "gt_answer": "如果执行失败，按备选模型继续尝试，直到成功或全部失败。"
+  },
+  {
+    "query_id": "query_011",
+    "user_question": "runEmbeddedPiAgent 的关键输入有哪些？",
+    "gold_query": "runEmbeddedPiAgent 的关键输入有哪些？",
+    "gt_answer": "runEmbeddedPiAgent 的关键输入包括：sessionId/sessionKey（用于 lane 隔离和路由回填）、provider/modelId（当前尝试目标）、messageChannel（决定默认输出格式 markdown/plain）。"
+  },
+  {
+    "query_id": "query_012",
+    "user_question": "回退层在候选模型尝试失败时是如何处理的？",
+    "gold_query": "回退层在候选模型尝试失败时是如何处理的？",
+    "gt_answer": "候选模型按顺序尝试，不是随机；记录每次失败原因（provider/model/error）；遇到不可回退错误会直接抛出，不继续降级。"
+  },
+  {
+    "query_id": "query_013",
+    "user_question": "如何生成稳定的 sessionKey？",
+    "gold_query": "生成稳定的 sessionKey 方法",
+    "gt_answer": "使用 resolveSessionKey(...) 函数（位于 src/config/sessions/session-key.ts）生成稳定 sessionKey。"
+  },
+  {
+    "query_id": "query_014",
+    "user_question": "如何通过 runId 反查 sessionKey？",
+    "gold_query": "runId 反查 sessionKey 方法",
+    "gt_answer": "使用 resolveSessionKeyForRun(runId) 从 run context 缓存和 session store 反查。"
+  },
+  {
+    "query_id": "query_015",
+    "user_question": "LaneState 包含哪些内部状态？",
+    "gold_query": "LaneState 内部状态",
+    "gt_answer": "LaneState 包含 queue（等待任务）、activeTaskIds（正在运行任务）、maxConcurrent（当前 lane 并发上限）、generation（reset 后防旧任务回写）。"
+  },
+  {
+    "query_id": "query_016",
+    "user_question": "clearCommandLane 和 resetAllLanes 有什么区别？",
+    "gold_query": "clearCommandLane resetAllLanes 区别",
+    "gt_answer": "clearCommandLane 只清“未执行任务”，并抛 CommandLaneClearedError；resetAllLanes 会提升 generation，防止旧任务结束时污染新状态。"
+  },
+  {
+    "query_id": "query_017",
+    "user_question": "工具与审批安全框架的核心思想是什么？",
+    "gold_query": "工具与审批安全框架 核心思想",
+    "gt_answer": "这套模块就是“工具防火墙 + 人工闸门”。先决定哪些工具可用，再决定高风险命令是否需要人工同意。没被明确允许的能力，默认不要放行。"
+  },
+  {
+    "query_id": "query_018",
+    "user_question": "执行链路中，从工具构建到审批决策回传，具体经过哪些步骤和函数？",
+    "gold_query": "执行链路 步骤 函数 工具构建 审批决策",
+    "gt_answer": "1. 构建工具全集：createOpenClawCodingTools(...) 先聚合 core + channel + plugin 工具。2. 策略过滤：applyToolPolicyPipeline(...) 按多层策略逐步过滤最终可用工具。3. 执行前审批判定：resolveExecApprovals(...) + requiresExecApproval(...) 判断是否必须审批。4. 网关审批流程：exec.approval.request -> ExecApprovalManager.register(...) -> 等待决策。5. 决策回传：审批端调用 exec.approval.resolve，网关唤醒等待方继续执行/拒绝。"
+  },
+  {
+    "query_id": "query_019",
+    "user_question": "工具策略流水线的顺序是什么？顺序错了会有什么后果？",
+    "gold_query": "工具策略流水线顺序 顺序错了 后果",
+    "gt_answer": "工具策略流水线顺序为：tools.profile、tools.providerProfiles、tools.allow、tools.providers.*、agents.*.tools、group tools.allow、sandbox tools.allow、subagent tools.allow。顺序错了会出现“上层规则被下层意外放开”。"
+  },
+  {
+    "query_id": "query_020",
+    "user_question": "ExecApprovalManager 的状态机有哪些方法？timeout 时如何处理？",
+    "gold_query": "ExecApprovalManager 状态机 方法 timeout 处理",
+    "gt_answer": "ExecApprovalManager 的状态机包括：create(...) 生成 id/createdAtMs/expiresAtMs；register(...) 同步放入 pending map，返回 decision Promise；resolve(...) 写入决策并 resolve Promise；timeout 时自动 resolve null。"
+  },
+  {
+    "query_id": "query_021",
+    "user_question": "registerApproval 函数在同一个 id 已经存在且未 resolved 时是怎么处理的？",
+    "gold_query": "registerApproval 幂等 已存在未resolved 处理",
+    "gt_answer": "如果 pending 中已存在该 id 且未 resolved，会返回一个新的 Promise，并把 existing.done 替换为新的函数：先调用原来的 prevDone(d)，再 resolve(d)，从而让多个等待者都能收到同一个决策结果。"
+  },
+  {
+    "query_id": "query_022",
+    "user_question": "registerApproval 的超时机制是如何实现的？",
+    "gold_query": "registerApproval 超时 setTimeout 实现",
+    "gt_answer": "在创建新 Entry 时用 setTimeout 设置定时器，超时后先检查 entry.resolved，若未 resolved 则将其置为 true 并调用 entry.done(null)，即超时返回 null。"
+  },
+  {
+    "query_id": "query_023",
+    "user_question": "系统重启前如何判断是否应该延迟重启？",
+    "gold_query": "重启延迟策略 活动任务统计 queueSize pendingReplies embeddedRuns",
+    "gt_answer": "重启前通过统计活动任务来决定是否延迟重启，具体包括：queueSize（命令队列）、pendingReplies（待发送回复）、embeddedRuns（运行中的 agent）。三者合计决定是否延迟重启。延迟重启通过 deferGatewayRestartUntilIdle 实现，它轮询活动任务，空闲后才 emitGatewayRestart()。该函数有三个回调：onReady（已空闲，立刻重启）、onTimeout（等太久，强制重启）、onCheckError（统计失败，保守重启）。"
+  },
+  {
+    "query_id": "query_024",
+    "user_question": "关停时的正确顺序是什么？",
+    "gold_query": "关停顺序 停发现/暴露 停plugin services/channel/watcher 广播shutdown 关闭ws/http",
+    "gt_answer": "关停顺序必须稳定，依次为：1. 停发现/暴露（bonjour/tailscale）；2. 停 plugin services / channel / watcher；3. 广播 shutdown；4. 关闭 ws、http。统一 close 流程由 createGatewayCloseHandler 实现，先 stop 各类 sidecar/channel，再 broadcast shutdown，最后关 ws/http。"
+  },
+  {
+    "query_id": "query_025",
+    "user_question": "onConfigChange 函数在配置变化时如何处理重启和热重载？",
+    "gold_query": "onConfigChange 函数在配置变化时如何处理重启和热重载？",
+    "gt_answer": "onConfigChange 函数首先通过 classify(paths) 将配置变化分类为 hot、restart 或 noop。如果 plan.restart 为真，则等待空闲（最多 30 秒），然后发出一次 SIGUSR1 重启信号并返回。如果 plan.hot 为真，则执行 applyHotReload(plan) 进行热重载。"
+  },
+  {
+    "query_id": "query_026",
+    "user_question": "closeGateway 函数关闭网关时按什么顺序执行哪些操作？",
+    "gold_query": "closeGateway 函数关闭网关时按什么顺序执行哪些操作？",
+    "gt_answer": "closeGateway 函数依次执行：先停止发现和暴露（stopDiscoveryAndExposure），再停止通道和插件（stopChannelsAndPlugins），然后广播关闭（broadcastShutdown），最后关闭网络服务器（closeNetworkServers）。"
+  },
+  {
+    "query_id": "query_027",
+    "user_question": "Gateway 是什么？",
+    "gold_query": "Gateway 是什么",
+    "gt_answer": "Gateway 是网关主程序，可以理解成“门卫 + 总调度台”。"
+  },
+  {
+    "query_id": "query_028",
+    "user_question": "sessionKey 的作用是什么？",
+    "gold_query": "sessionKey 的作用",
+    "gt_answer": "sessionKey 是一次对话的唯一钥匙，决定“这条消息属于哪个会话”。"
+  },
+  {
+    "query_id": "query_029",
+    "user_question": "OpenClaw 的智能体为什么能长期跑，而不是只在 demo 里跑一次？",
+    "gold_query": "OpenClaw 智能体 长期跑 原理",
+    "gt_answer": "因为真实链路不是一次 model.generate()，而是多层状态机：queue(session lane) -> queue(global lane) -> attempt -> subscribe(stream) -> wait compaction -> finalize -> (error? rotate profile / compact / fallback)。对应到代码包括调度层 runEmbeddedPiAgent、执行层 runEmbeddedAttempt、事件层 subscribeEmbeddedPiSession、运行注册层 setActiveEmbeddedRun/clearActiveEmbeddedRun、跨模型韧性层 runWithModelFallback。"
+  },
+  {
+    "query_id": "query_030",
+    "user_question": "runEmbeddedPiAgent 在调度层做了哪些宏观决策？",
+    "gold_query": "runEmbeddedPiAgent 调度层 宏观决策",
+    "gt_answer": "runEmbeddedPiAgent 不做细节执行，只做宏观决策：1. 并发隔离：resolveSessionLane + resolveGlobalLane，再双层 enqueue；2. 预检拦截：resolveContextWindowInfo + evaluateContextWindowGuard，窗口太小直接阻断；3. 认证与账户轮换：内部 advanceAuthProfile，限流/鉴权后切账号；4. 上下文溢出恢复：先 compactEmbeddedPiSessionDirect，再 truncateOversizedToolResultsInSession，超过上限返回可读错误，不死循环；5. 最终输出拼装：构建 payload + meta（usage、provider、model、error）。"
+  },
+  {
+    "query_id": "query_031",
+    "user_question": "runEmbeddedAttempt 的执行顺序是什么？",
+    "gold_query": "runEmbeddedAttempt 执行顺序",
+    "gt_answer": "1. 会话卫生：sanitizeSessionHistory、limitHistoryTurns、sanitizeToolUseResultPairing；2. 挂订阅：subscribeEmbeddedPiSession；3. Hook 注入：runBeforeAgentStart，若返回 prependContext，拼成 prependContext + prompt；4. 执行 prompt：activeSession.prompt；5. 等压缩稳定：waitForCompactionRetry；6. 快照选择：压缩超时时 selectCompactionTimeoutSnapshot；7. 收尾 Hook：runAgentEnd；8. finally 清理：unsubscribe、释放 active run、释放会话资源。"
+  },
+  {
+    "query_id": "query_032",
+    "user_question": "runWithModelFallback 的跨模型兜底流程是怎样的？",
+    "gold_query": "runWithModelFallback 跨模型兜底流程",
+    "gt_answer": "1. resolveFallbackCandidates 先生成候选列表（主模型 + fallbacks + 去重）；2. 每次失败后：coerceToFailoverError 归一化错误，describeFailoverError 记录 reason/status/code；3. shouldRethrowAbort 对用户主动 Abort 直接停止，不做 fallback；4. 全失败时返回汇总错误：All models failed (...)。"
+  },
+  {
+    "query_id": "query_033",
+    "user_question": "从零开始复刻这个系统，第一版和第二版分别应该实现哪些层？",
+    "gold_query": "从0到1复刻建议 第一版 第二版 层",
+    "gt_answer": "第一版先抄3层：run（调度）、attempt（单次事务）、subscribe（事件聚合）。第二版补2层：runs（运行注册与中断）、model-fallback（跨模型兜底）。"
+  },
+  {
+    "query_id": "query_034",
+    "user_question": "自检清单里有哪些检查项？",
+    "gold_query": "自检清单 检查项",
+    "gt_answer": "1. 同一会话是否严格串行，不会消息乱序。2. 压缩重试期间是否不会提前返回“完成”。3. abort 后是否不会残留 active run。4. 模型失败时是否有结构化 attempts 轨迹。5. 账号轮换、压缩恢复、fallback 是否互不打架。"
+  },
+  {
+    "query_id": "query_035",
+    "user_question": "上下文窗口预检的两条红线是什么？",
+    "gold_query": "上下文窗口预检 红线 阈值",
+    "gt_answer": "CONTEXT_WINDOW_HARD_MIN_TOKENS = 16000 和 CONTEXT_WINDOW_WARN_BELOW_TOKENS = 32000。"
+  },
+  {
+    "query_id": "query_036",
+    "user_question": "历史截断是如何根据会话类型动态限额的？",
+    "gold_query": "历史截断 会话类型 动态限额",
+    "gt_answer": "通过 getHistoryLimitFromSessionKey 从 sessionKey 识别会话类型：dm/direct 走 dmHistoryLimit 或 dms.<user>.historyLimit；channel/group 走 historyLimit。然后 limitHistoryTurns 只保留最近 N 个 user turn 及其关联上下文。"
+  },
+  {
+    "query_id": "query_037",
+    "user_question": "为什么在 run/attempt.ts 中，sanitizeToolUseResultPairing 要在 limitHistoryTurns 之后再次运行？",
+    "gold_query": "为什么 sanitizeToolUseResultPairing 要在 limitHistoryTurns 之后再次运行",
+    "gt_answer": "因为 limitHistoryTurns 可能把某个 tool_use 删掉，却留下 tool_result，变成孤儿消息，Anthropic 类接口会直接 400。"
+  },
+  {
+    "query_id": "query_038",
+    "user_question": "waitForCompactionRetry() 的语义是什么？",
+    "gold_query": "waitForCompactionRetry 的语义",
+    "gt_answer": "1. 如果还在压缩或待重试，等待 promise；2. 如果已 unsubscribe，抛 AbortError；3. 否则立即返回。"
+  },
+  {
+    "query_id": "query_039",
+    "user_question": "在长会话中，如何准备消息历史以避免孤儿 toolResult？",
+    "gold_query": "长会话 准备消息历史 避免孤儿 toolResult",
+    "gt_answer": "通过 prepare 函数处理消息历史：先调用 sanitizeSessionHistory 清理，再 validateProviderTurns 验证，然后 limitHistoryTurns 限制轮数，最后 sanitizeToolUseResultPairing 确保 toolResult 配对，从而避免孤儿 toolResult。"
+  },
+  {
+    "query_id": "query_040",
+    "user_question": "压缩期间超时，如何返回一致的快照？",
+    "gold_query": "压缩期间超时 返回一致快照",
+    "gt_answer": "在 runTurnWithCompactionWait 函数中，捕获错误后，如果 isCompactionTimeout(err) 为真，则调用 selectCompactionTimeoutSnapshot，传入超时标志、压缩前快照和会话ID、当前快照和会话ID，返回其 messagesSnapshot 作为一致快照。"
+  },
+  {
+    "query_id": "query_041",
+    "user_question": "工具策略与安全原理主要讲哪两件事？",
+    "gold_query": "工具策略与安全原理主要讲哪两件事",
+    "gt_answer": "1. 哪些工具可以被模型看到；2. 哪些命令必须人工审批。"
+  },
+  {
+    "query_id": "query_042",
+    "user_question": "工具从全集到执行再到审批决策的总体状态机流程是什么？",
+    "gold_query": "工具总体状态机流程",
+    "gt_answer": "工具全集 -> owner 裁剪 -> 多层策略过滤 -> schema 规范化 -> before_tool_call 二次拦截 -> 执行 -> after_tool_call 审计 -> 高风险审批决策"
+  },
+  {
+    "query_id": "query_043",
+    "user_question": "createOpenClawCodingTools 里 applyOwnerOnlyToolPolicy 是怎么执行的？senderIsOwner 默认值是什么？",
+    "gold_query": "createOpenClawCodingTools applyOwnerOnlyToolPolicy senderIsOwner 默认值",
+    "gt_answer": "第 1 步执行 applyOwnerOnlyToolPolicy。senderIsOwner 默认 false：安全优先，opt-in，不是 opt-out。代码为 const senderIsOwner = options?.senderIsOwner === true; const toolsByAuthorization = applyOwnerOnlyToolPolicy(tools, senderIsOwner);。非 owner 请求在这里先砍掉所有 owner-only 工具（高风险能力），后续步骤看不到它们。"
+  },
+  {
+    "query_id": "query_044",
+    "user_question": "buildDefaultToolPolicyPipelineSteps 生成的步骤顺序和标签是什么？",
+    "gold_query": "buildDefaultToolPolicyPipelineSteps 步骤顺序 标签",
+    "gt_answer": "步骤顺序固定为：1. profilePolicy，label 为 tools.profile (${profile})，stripPluginOnlyAllowlist: true；2. providerProfilePolicy，label 为 tools.provider-profile (${profile})，stripPluginOnlyAllowlist: true；3. globalPolicy，label 为 tools.global；4. globalProviderPolicy，label 为 tools.global-provider；5. agentPolicy，label 为 tools.agent (${agentId})，仅 agentId 非空时存在；6. agentProviderPolicy，label 为 tools.agent-provider (${agentId})，仅 agentId 非空时存在；7. groupPolicy，label 为 group tools.allow，stripPluginOnlyAllowlist: true；pi-tools.ts 在 pipeline 外追加：sandbox?.tools，label 为 sandbox tools.allow。"
+  },
+  {
+    "query_id": "query_045",
+    "user_question": "工具策略 pipeline 中 stripPluginOnlyAllowlist 有什么作用？",
+    "gold_query": "stripPluginOnlyAllowlist 作用",
+    "gt_answer": "profile / provider-profile / group 的 allowlist 如果只包含插件专有工具（但该插件未启用），pipeline 会自动剥离该 allowlist，避免出现“allowlist 存在但无一匹配”导致核心工具全部被清空的问题。"
+  },
+  {
+    "query_id": "query_046",
+    "user_question": "为什么工具参数需要 normalizeToolParameters 规范化？",
+    "gold_query": "normalizeToolParameters 原因",
+    "gt_answer": "把工具的 JSON Schema 规范化后再交给 pi-agent/pi-ai。原因：OpenAI 会拒绝根级 union schema（如 anyOf 在根节点），必须先展开。没有这一步，部分工具在 OpenAI provider 下会被服务端拒绝，而且错误信息不容易定位。"
+  },
+  {
+    "query_id": "query_047",
+    "user_question": "before_tool_call hook 返回 block 为 true 时，工具会执行吗？",
+    "gold_query": "before_tool_call hook block true 工具执行",
+    "gt_answer": "不会执行。如果 hookResult.block 为 true，会直接 throw 一个错误，错误信息为 hookResult.blockReason 或 \"Tool call blocked by plugin hook\"，工具不会执行。"
+  },
+  {
+    "query_id": "query_048",
+    "user_question": "多个插件的 before_tool_call 结果如何合并？",
+    "gold_query": "多插件 before_tool_call 合并规则",
+    "gt_answer": "每个插件的 before_tool_call 结果按注册顺序合并，合并规则为：params 取 next.params 如果存在否则取 acc.params；block 取 next.block 如果存在否则取 acc.block；blockReason 取 next.blockReason 如果存在否则取 acc.blockReason。最后一个插件的 params 会覆盖前面的（last-write-wins）。"
+  },
+  {
+    "query_id": "query_049",
+    "user_question": "工具调用成功和失败时都会触发 after_tool_call 吗？触发方式是怎样的？",
+    "gold_query": "after_tool_call 触发条件 成功路径 失败路径 fire-and-forget",
+    "gt_answer": "成功和失败路径都会触发 after_tool_call。成功路径在 pi-tool-definition-adapter.ts 中调用 hookRunner.runAfterToolCall({ toolName, params: afterParams, result }, { toolName })；失败路径在 catch 分支调用 hookRunner.runAfterToolCall({ toolName, params, error: described.message }, { toolName })。两条路径都是 fire-and-forget（不 await），Hook 失败只记 debug log，不影响工具返回值。"
+  },
+  {
+    "query_id": "query_050",
+    "user_question": "durationMs 是怎么计算的？在哪个源码文件里？",
+    "gold_query": "durationMs 计算 源码 pi-embedded-subscribe.handlers.tools.ts",
+    "gt_answer": "durationMs 在源码 pi-embedded-subscribe.handlers.tools.ts 中计算。订阅层里额外跟踪了工具执行耗时：tool_execution_start 时记录 toolStartData.set(toolCallId, { startTime: Date.now(), args })；tool_execution_end 时触发 after_tool_call，计算 const durationMs = startData?.startTime != null ? Date.now() - startData.startTime : undefined，并放入 hookEvent 中。"
+  },
+  {
+    "query_id": "query_051",
+    "user_question": "apply_patch 工具默认对哪些 provider 开放？如何扩展允许的模型列表？",
+    "gold_query": "apply_patch 默认对哪些 provider 开放 如何扩展允许的模型列表",
+    "gt_answer": "apply_patch 默认仅对 OpenAI provider 开放。可通过 tools.exec.applyPatch.allowModels 配置扩展允许的 model 列表。"
+  },
+  {
+    "query_id": "query_052",
+    "user_question": "ExecApprovalDecision 有哪几种？requiresExecApproval 的核心条件是什么？",
+    "gold_query": "ExecApprovalDecision 有哪几种 requiresExecApproval 的核心条件是什么",
+    "gt_answer": "ExecApprovalDecision 只有三种：allow-once、allow-always、deny。requiresExecApproval 的核心条件：1. ask=always：永远审批；2. ask=on-miss 且 security=allowlist：命令不满足白名单或分析失败时审批；3. 其他场景不审批。"
+  },
+  {
+    "query_id": "query_053",
+    "user_question": "buildAllowedTools 函数的执行步骤顺序是什么？",
+    "gold_query": "buildAllowedTools 执行步骤顺序",
+    "gt_answer": "buildAllowedTools 的执行步骤顺序为：1. owner-only 裁剪；2. 多层 pipeline（顺序固定）；3. schema 规范化（防 OpenAI union schema 报错）；4. Hook 注入。"
+  },
+  {
+    "query_id": "query_054",
+    "user_question": "executeWithApproval 中审批超时后返回什么？",
+    "gold_query": "executeWithApproval 审批超时 返回",
+    "gt_answer": "审批超时返回 null，而不是永远挂起。"
+  },
+  {
+    "query_id": "query_055",
+    "user_question": "模型回退时，错误分类器如何判断一个错误是否可回退？",
+    "gold_query": "模型回退 错误分类器 判断可回退失败",
+    "gt_answer": "错误分类器通过 FailoverError 统一错误容器，核心字段包括 reason（billing/rate_limit/auth/timeout/format/unknown）、provider/model/profileId、status/code。分类逻辑 resolveFailoverReasonFromError 先看 HTTP status（402/429/401/403/408/400），再看错误码（如 ETIMEDOUT），最后看 message 文本（通过 classifyFailoverReason）。辅助函数 coerceToFailoverError 把普通错误转成 FailoverError，describeFailoverError 提取 message/reason/status/code。"
+  },
+  {
+    "query_id": "query_056",
+    "user_question": "回退执行主循环 runWithModelFallback 的流程是怎样的？",
+    "gold_query": "runWithModelFallback 回退执行主循环 流程",
+    "gt_answer": "runWithModelFallback 关键流程：1. 遍历 candidates；2. 调 params.run(provider, model)；3. 成功立即返回 {result, provider, model, attempts}；4. 失败后：shouldRethrowAbort 命中则直接抛（用户中断优先），coerceToFailoverError 失败则视为非回退错误直接抛，记录 attempts.push({provider, model, reason, status, code})；5. 全失败抛汇总错误：All models failed (...)。"
+  },
+  {
+    "query_id": "query_057",
+    "user_question": "在 run.ts 中，attempt 失败后除了 fallback 模型，还会做哪些操作？",
+    "gold_query": "run.ts attempt 失败后除了 fallback 模型还会做什么",
+    "gt_answer": "1. 标记 auth profile 失败；2. advanceAuthProfile(...) 切账号重试；3. 上下文溢出时优先 compaction，再考虑 fallback。"
+  },
+  {
+    "query_id": "query_058",
+    "user_question": "哪些场景不应该回退，应该立即停止？",
+    "gold_query": "哪些场景不应该回退应该立即停止",
+    "gt_answer": "1. 用户主动 Abort（AbortError 且非 timeout）；2. 业务逻辑错误（无法归一化为 failover reason）；3. 参数/数据结构严重错误（需要修代码，不是换模型）。"
+  },
+  {
+    "query_id": "query_059",
+    "user_question": "子智能体 spawn 的流程是什么？",
+    "gold_query": "子智能体 spawn 状态机流程",
+    "gt_answer": "1. 参数解析：task/agentId/model/thinking/runTimeoutSeconds/cleanup；2. 递归防护：若当前会话是 subagent（isSubagentSessionKey(...)）直接拒绝；3. agent 白名单：subagents.allowAgents 校验跨 agent spawn 权限；4. 创建子会话 key：agent:<target>:subagent:<uuid>；5. 可选配置覆盖：sessions.patch 写 model、sessions.patch 写 thinkingLevel；6. 构造子系统提示：buildSubagentSystemPrompt(...)；7. 调网关启动子运行：method=agent（lane=AGENT_LANE_SUBAGENT）；8. 注册生命周期：registerSubagentRun(...)。"
+  },
+  {
+    "query_id": "query_060",
+    "user_question": "子运行生命周期管理包括哪些内容？",
+    "gold_query": "子运行生命周期管理",
+    "gt_answer": "1. 内存 + 落盘：subagentRuns + saveSubagentRegistryToDisk(...)；2. 启动恢复：restoreSubagentRunsOnce()，重启后恢复未完成 run；3. 等待完成：事件监听 onAgentEvent(lifecycle)、RPC 兜底 agent.wait；4. 通知主会话：runSubagentAnnounceFlow(...)；5. 清理策略：cleanup=delete 删除子会话、cleanup=keep 保留结果；6. 归档清扫：按 archiveAfterMinutes 定时清理历史 run。"
+  },
+  {
+    "query_id": "query_061",
+    "user_question": "runSubagentAnnounceFlow 的关键设计是什么？",
+    "gold_query": "runSubagentAnnounceFlow 关键设计",
+    "gt_answer": "1. 先等待 child run 彻底 settled（避免压缩重试中提前汇报）\n2. 构造 triggerMessage 给主智能体，不直接对用户硬回写\n3. 由主智能体用自己的语气二次总结，保证对话风格一致\n4. 支持 NO_REPLY，允许内部子任务静默完成"
+  },
+  {
+    "query_id": "query_062",
+    "user_question": "sessions_send 支持哪些功能？",
+    "gold_query": "sessions_send 跨会话协同 功能",
+    "gt_answer": "1. sessionKey 或 label 定位目标会话\n2. sandbox 可见性限制（sessionToolsVisibility=spawned）\n3. agent-to-agent 策略校验（tools.agentToAgent.allow）\n4. 嵌套 lane 执行：AGENT_LANE_NESTED\n5. A2A 宣告流：runSessionsSendA2AFlow(...)"
+  },
+  {
+    "query_id": "query_063",
+    "user_question": "子智能体可以再创建子智能体吗？",
+    "gold_query": "子智能体可以再创建子智能体吗？",
+    "gt_answer": "不可以。在 spawnSubagent 函数中，如果 parent.isSubagent 为 true，会抛出错误 \"subagent cannot spawn subagent\"。"
+  },
+  {
+    "query_id": "query_064",
+    "user_question": "修改 SKILL.md 后，下一轮会拿到新的 snapshot version 吗？",
+    "gold_query": "修改 SKILL.md 后，下一轮会拿到新的 snapshot version 吗？",
+    "gt_answer": "会。自检清单第5条要求检查修改 SKILL.md 后下一轮是否拿到新 snapshot version，说明预期行为是下一轮会拿到新的 snapshot version。"
+  },
+  {
+    "query_id": "query_065",
+    "user_question": "AI优秀实现五件套包括哪些？",
+    "gold_query": "AI优秀实现五件套包括哪些？",
+    "gt_answer": "五件套包括：1. 执行链路分层状态机；2. 上下文卫生与压缩恢复；3. 工具策略与审批闸门；4. 模型回退与错误归一化；5. 子智能体编排与技能快照。"
+  },
+  {
+    "query_id": "query_066",
+    "user_question": "执行链路分层状态机的状态流转顺序是什么？",
+    "gold_query": "执行链路分层状态机的状态流转顺序是什么？",
+    "gt_answer": "状态机流转顺序为：queued -> attempting -> streaming -> compacting(optional) -> completed/failed -> cleanup。"
+  },
+  {
+    "query_id": "query_067",
+    "user_question": "模型回退与错误归一化套件对应哪些源码文件？",
+    "gold_query": "模型回退与错误归一化套件对应哪些源码文件？",
+    "gt_answer": "对应源码为：src/agents/model-fallback.ts、src/agents/failover-error.ts、src/agents/pi-embedded-helpers/errors.ts。"
+  },
+  {
+    "query_id": "query_068",
+    "user_question": "子智能体编排与技能快照套件有哪些可抄要点？",
+    "gold_query": "子智能体编排与技能快照套件有哪些可抄要点？",
+    "gt_answer": "可抄要点包括：1. spawn 必须独立会话 + 防递归；2. 子 run 必须注册、可恢复、可清理；3. 子结果回传主会话，不直接硬发给用户；4. 技能采用 snapshot + version，不要每轮全盘扫描。"
+  },
+  {
+    "query_id": "query_069",
+    "user_question": "交付前自检中，运行链路和上下文分别要检查什么？",
+    "gold_query": "交付前自检 运行链路 上下文 检查项",
+    "gt_answer": "运行链路：同 session 串行、abort 可中断、finally 能清理。上下文：无孤儿 tool_result，压缩重试可等待。"
+  },
+  {
+    "query_id": "query_070",
+    "user_question": "交付前自检中，工具安全、回退和编排分别要检查什么？",
+    "gold_query": "交付前自检 工具安全 回退 编排 检查项",
+    "gt_answer": "工具安全：策略顺序固定，审批支持 timeout。回退：attempts 带 reason/status/code。编排：子任务可恢复，技能改动能自动升版。"
+  },
+  {
+    "query_id": "query_071",
+    "user_question": "OpenClaw 记忆系统里 maxInjectedChars 默认是多少，作用是什么？",
+    "gold_query": "OpenClaw 记忆系统 maxInjectedChars 默认值 作用",
+    "gt_answer": "maxInjectedChars 默认 4000，用于限制注入上下文的总字符上限，防止记忆挤爆上下文。"
+  },
+  {
+    "query_id": "query_072",
+    "user_question": "getMemorySearchManager 在 backend=qmd 且 QmdMemoryManager.create 失败时会怎么处理？",
+    "gold_query": "getMemorySearchManager backend qmd QmdMemoryManager.create 失败 回退",
+    "gt_answer": "会 warn，然后动态 import MemoryIndexManager（builtin）作为回退。"
+  },
+  {
+    "query_id": "query_073",
+    "user_question": "FallbackMemoryManager 里 primaryFailed 和 fallback 这两个字段分别代表什么？",
+    "gold_query": "FallbackMemoryManager primaryFailed fallback 字段含义",
+    "gt_answer": "primaryFailed 表示 qmd 是否已失效，默认 false；fallback 是懒加载的 builtin MemorySearchManager，初始为 null。"
+  },
+  {
+    "query_id": "query_074",
+    "user_question": "qmd 的 search 抛错后 FallbackMemoryManager 会做什么？",
+    "gold_query": "qmd search 抛错 FallbackMemoryManager 状态转换",
+    "gt_answer": "qmd search 抛错时，将 primaryFailed 设为 true，关闭 qmd，并记录 lastError；之后通过 ensureFallback() 懒加载 builtin manager，后续所有请求走 fallback。"
+  },
+  {
+    "query_id": "query_075",
+    "user_question": "evictCacheEntry 的作用是什么？",
+    "gold_query": "evictCacheEntry 缓存主动失效 作用",
+    "gt_answer": "evictCacheEntry 会从 QMD_MANAGER_CACHE 中删除当前 cacheKey 对应的缓存，并将 cacheEvicted 设为 true。这样 qmd 失败后下次 getMemorySearchManager 调用会重新尝试创建 qmd，而不是永远返回已失效的缓存实例，是在线自愈的核心设计。"
+  },
+  {
+    "query_id": "query_076",
+    "user_question": "MemorySearchManager 接口里哪些方法是可选的？",
+    "gold_query": "MemorySearchManager 接口 可选方法",
+    "gt_answer": "可选方法包括 sync、probeEmbeddingAvailability、probeVectorAvailability 和 close，并非所有 backend 都实现。"
+  },
+  {
+    "query_id": "query_077",
+    "user_question": "memory_search 工具在回答前会强制模型做什么？",
+    "gold_query": "memory_search 强制召回步骤",
+    "gt_answer": "memory_search 的源码描述中写着 \"Mandatory recall step\"，这是刻意的措辞，强迫模型在回答前必须先做记忆召回。"
+  },
+  {
+    "query_id": "query_078",
+    "user_question": "memory_get 工具的作用是什么？应该在什么时候使用？",
+    "gold_query": "memory_get 工具作用 使用时机",
+    "gt_answer": "memory_get 用于从 MEMORY.md 或 memory/*.md 中安全地读取片段，支持可选的 from/lines 参数；应在 memory_search 之后使用，只拉取需要的行，保持上下文精简。"
+  },
+  {
+    "query_id": "query_079",
+    "user_question": "启动预热模块在网关启动时做了什么？",
+    "gold_query": "启动预热模块在网关启动时做了什么？",
+    "gt_answer": "`startGatewayMemoryBackend(...)` 在网关启动时执行：非 qmd 直接跳过；qmd 时提前调用 `getMemorySearchManager(...)` + `probeVectorAvailability()`；成功打 info，失败打 warn。目的是把故障前置到启动阶段，不等用户首问才炸。"
+  },
+  {
+    "query_id": "query_080",
+    "user_question": "记忆进入主回答有哪两条路？建议优先做哪条？",
+    "gold_query": "记忆进入主回答有哪两条路？建议优先做哪条？",
+    "gt_answer": "记忆进入主回答有两条路：1. 工具路：模型主动调用 `memory_search/memory_get`；2. 注入路：插件在 `before_agent_start` 生成 `prependContext`。建议优先做“工具路”，更稳定、可控、可调试。"
+  },
+  {
+    "query_id": "query_081",
+    "user_question": "resolveMemoryManager 在 qmd 后端下如何做缓存和降级？",
+    "gold_query": "resolveMemoryManager qmd 缓存 降级 FallbackMemoryManager",
+    "gt_answer": "当 resolved.backend 为 \"qmd\" 时，先用 buildQmdCacheKey(agentId, resolved.qmd) 生成 cacheKey，并在 QMD_MANAGER_CACHE 中查找缓存，命中则直接返回。未命中时尝试用 QmdMemoryManager.create(resolved) 创建 primary，再用 FallbackMemoryManager(primary, cacheKey, () => createBuiltinManager(cfg, agentId)) 包装成 fallback，写入缓存并返回 fallback。若创建过程抛错，则直接返回 await createBuiltinManager(cfg, agentId)。非 qmd 后端也直接返回内置 manager。"
+  },
+  {
+    "query_id": "query_082",
+    "user_question": "memorySearch 的检索流程和结果处理是怎样的？",
+    "gold_query": "memorySearch 检索流程 maxResults 5 decorateCitations clampResultsByInjectedChars 4000",
+    "gt_answer": "memorySearch 先通过 resolveMemoryManager(cfg, agentId) 获取 manager，scope guard 由 manager.search 内部处理。然后调用 manager.search(query, { maxResults: 5, sessionKey }) 得到 raw 结果，再用 decorateCitations(raw, shouldIncludeCitations(cfg)) 添加引用，最后通过 clampResultsByInjectedChars(withCitations, 4000) 按注入字符数限制返回。"
+  },
+  {
+    "query_id": "query_083",
+    "user_question": "qmd 挂掉后怎么自动切到 builtin？",
+    "gold_query": "qmd 挂掉后自动切 builtin 的机制",
+    "gt_answer": "在 `primaryFailed=true` 后调用 `ensureFallback()`，即可自动切换到 builtin。"
+  },
+  {
+    "query_id": "query_084",
+    "user_question": "启动阶段怎么提前发现 qmd 配置错误？",
+    "gold_query": "启动阶段提前暴露 qmd 配置错误的方法",
+    "gt_answer": "通过 `probeVectorAvailability` 在启动阶段提前暴露 qmd 配置错误。"
+  },
+  {
+    "query_id": "query_085",
+    "user_question": "Hook 调度器有哪两种执行模型？它们分别有什么特点？",
+    "gold_query": "Hook 调度器 执行模型 runVoidHook runModifyingHook",
+    "gt_answer": "Hook 调度器有两种执行模型：1. runVoidHook：按 hookName 找到处理器，按 priority 排序，使用 Promise.all 并行执行，默认 catchErrors=true，单个 hook 失败只记日志。2. runModifyingHook：按 priority 顺序执行，每个 handler 可以返回修改结果，通过 merge 规则合并。"
+  },
+  {
+    "query_id": "query_086",
+    "user_question": "工具调用前 Hook 可以做什么？异常如何处理？",
+    "gold_query": "工具调用前 Hook runBeforeToolCallHook 阻断 改写参数 异常处理",
+    "gt_answer": "工具调用前 Hook（runBeforeToolCallHook）可以：1. 返回 block=true 阻断；2. 返回 params 改写参数。异常默认只记日志并放行原参数。"
+  },
+  {
+    "query_id": "query_087",
+    "user_question": "工具调用后 runAfterToolCall 在成功和错误路径上是怎么调用的？",
+    "gold_query": "工具调用后 runAfterToolCall 成功路径 错误路径 调用",
+    "gt_answer": "成功路径调用 runAfterToolCall(...)，错误路径同样调用 runAfterToolCall(...)，这保证了审计完整性。"
+  },
+  {
+    "query_id": "query_088",
+    "user_question": "插件冲突处理是后注册覆盖前注册吗？method、route、command 冲突分别怎么处理？",
+    "gold_query": "插件冲突处理 method route command 冲突 拒绝 diagnostic",
+    "gt_answer": "插件冲突处理不是“后注册覆盖前注册”：method 冲突拒绝并写 diagnostic；route 冲突拒绝并写 diagnostic；command 冲突拒绝并写 diagnostic。"
+  },
+  {
+    "query_id": "query_089",
+    "user_question": "modifying hook 的执行顺序是怎样的？",
+    "gold_query": "modifying hook 是否严格按 priority 顺序执行",
+    "gt_answer": "modifying hook 严格按 priority 顺序执行。"
+  },
+  {
+    "query_id": "query_090",
+    "user_question": "void hook 会阻塞主回复吗？",
+    "gold_query": "void hook 是否并行执行且不会阻塞主回复",
+    "gt_answer": "void hook 并行执行且不会阻塞主回复。"
+  },
+  {
+    "query_id": "query_091",
+    "user_question": "插件来源的优先级顺序是什么？",
+    "gold_query": "插件来源优先级顺序",
+    "gt_answer": "config > workspace > global > bundled"
+  },
+  {
+    "query_id": "query_092",
+    "user_question": "memory slot 排他治理中，resolveMemorySlotDecision 的三种决策是什么？",
+    "gold_query": "resolveMemorySlotDecision 决策",
+    "gt_answer": "1. slot = null：memory 能力整体禁用；2. slot = <id>：只允许指定插件；3. 自动选择模式：第一个占位，后续 memory 插件被拒绝。"
+  },
+  {
+    "query_id": "query_093",
+    "user_question": "Hook 冲突治理中，getHooksForName、runModifyingHook 和 runVoidHook 的执行规则分别是什么？",
+    "gold_query": "Hook 冲突治理 getHooksForName runModifyingHook runVoidHook 执行规则",
+    "gt_answer": "getHooksForName 按 priority 降序；runModifyingHook 顺序执行并 merge；runVoidHook 并行执行。这样既保证安全插件优先，又不牺牲观察型 hook 吞吐。"
+  },
+  {
+    "query_id": "query_094",
+    "user_question": "诊断闭环中，所有问题汇总到 registry.diagnostics 后，会经过哪些处理步骤？",
+    "gold_query": "诊断闭环 registry.diagnostics 处理步骤",
+    "gt_answer": "所有问题（包括 loader 错误、manifest 冲突、注册冲突、配置 schema 错误）汇总到 registry.diagnostics，然后：1. config/validation.ts 映射为配置 issue；2. plugins list/doctor 输出可读结论和修复提示。"
+  },
+  {
+    "query_id": "query_095",
+    "user_question": "如何实现上下文管理，避免历史消息无限增长撑爆模型窗口？",
+    "gold_query": "上下文管理 实现 历史消息 无限增长 模型窗口",
+    "gt_answer": "通过窗口守卫（resolveContextWindowInfo 和 evaluateContextWindowGuard）在窗口低于硬下限时阻断；进入会话前做历史卫生，包括 sanitizeSessionHistory、validateGeminiTurns/validateAnthropicTurns、limitHistoryTurns、sanitizeToolUseResultPairing 和 replaceMessages；发生上下文溢出时自动恢复，先 compactEmbeddedPiSessionDirect（最多3次），再 truncateOversizedToolResultsInSession。"
+  },
+  {
+    "query_id": "query_096",
+    "user_question": "如何确保 tool_call 和 tool_result 永远成对，避免模型返回 400 错误？",
+    "gold_query": "tool_call tool_result 成对 避免 400 错误",
+    "gt_answer": "在进入会话前执行历史卫生，关键步骤包括 sanitizeToolUseResultPairing，该步骤会清理和修复 tool_call 与 tool_result 的配对关系，确保它们成对出现，从而避免模型因配对错误返回 400。"
+  },
+  {
+    "query_id": "query_097",
+    "user_question": "ContextWindowInfo 类型定义在哪个文件里，它有哪些字段？",
+    "gold_query": "ContextWindowInfo 类型定义 文件 字段",
+    "gt_answer": "ContextWindowInfo 定义在 src/agents/context-window-guard.ts 中，字段包括 tokens: number 和 source: \"model\" | \"modelsConfig\" | \"agentContextTokens\" | \"default\"。"
+  },
+  {
+    "query_id": "query_098",
+    "user_question": "ToolUseRepairReport 类型包含哪些字段？",
+    "gold_query": "ToolUseRepairReport 类型 字段",
+    "gt_answer": "ToolUseRepairReport 定义在 src/agents/session-transcript-repair.ts 中，字段包括 messages: AgentMessage[]、added: ToolResultMessage[]、droppedDuplicateCount: number、droppedOrphanCount: number 和 moved: boolean。"
+  },
+  {
+    "query_id": "query_099",
+    "user_question": "prepareMessages 函数里对消息历史做了哪些处理步骤？",
+    "gold_query": "prepareMessages 函数对消息历史做了哪些处理步骤",
+    "gt_answer": "依次执行：sanitizeSessionHistory 清理会话历史；validateProviderTurns 按 provider 选择 gemini/anthropic 校验；limitHistoryTurns 根据 getHistoryLimitFromSessionKey 得到的限制裁剪历史轮数；sanitizeToolUseResultPairing 修复工具使用与结果的配对；最后返回处理后的结果。"
+  },
+  {
+    "query_id": "query_100",
+    "user_question": "runWithContextGuard 在上下文窗口过小或溢出时分别怎么处理？",
+    "gold_query": "runWithContextGuard 上下文窗口过小或溢出时的处理方式",
+    "gt_answer": "先用 resolveContextWindowInfo 解析上下文窗口信息（defaultTokens 为 32000），再用 evaluateContextWindowGuard 以 hardMinTokens 16000 评估；若 guard.shouldBlock 为真则抛出 context window too small 错误。随后最多循环 3 次尝试 runSingleAttempt，仅在 isContextOverflow 错误时调用 compactSessionOnce 压缩会话，压缩失败则跳出循环；之后尝试 truncateOversizedToolResults 截断过大的工具结果，成功则再运行一次 runSingleAttempt，否则抛出 context overflow unresolved 错误。"
+  },
+  {
+    "query_id": "query_101",
+    "user_question": "同一会话跑100轮后，messages长度还会受控吗？",
+    "gold_query": "同一会话跑100轮后 messages长度 受控",
+    "gt_answer": "会受控。根据验收标准第1条，同一会话跑100轮后，messages长度仍受控。"
+  },
+  {
+    "query_id": "query_102",
+    "user_question": "开发者常犯的错误有哪些？",
+    "gold_query": "开发者最常犯错 避坑",
+    "gt_answer": "开发者最常犯的错误包括：1. 先截断再修复配对，导致孤儿toolResult；2. 把cacheRead/cacheWrite直接累计成“当前上下文”，误判成200k；3. 压缩超时后继续用当前快照，导致返回脏状态；4. 不做窗口硬下限，线上才发现某模型根本不可用。"
+  },
+  {
+    "query_id": "query_103",
+    "user_question": "智能体执行状态机有哪些状态？",
+    "gold_query": "智能体执行状态机状态列表",
+    "gt_answer": "状态机总图：idle -> queued(session lane) -> queued(global lane) -> attempting -> streaming -> compacting(optional) -> completed/failed -> idle。补充控制态：aborting（用户或超时触发）、waiting_compaction_retry（订阅层等待重试结束）。"
+  },
+  {
+    "query_id": "query_104",
+    "user_question": "runEmbeddedPiAgent 负责哪些事情？",
+    "gold_query": "runEmbeddedPiAgent 职责",
+    "gt_answer": "runEmbeddedPiAgent 负责：1. 车道排队：enqueue(sessionLane) 再 enqueue(globalLane)。2. 模型/鉴权准备：resolveModel + auth profile 轮换。3. 执行循环：while(true) 调 runEmbeddedAttempt(...)。4. 故障分支：上下文溢出、限流、鉴权失败、thinking 降级、profile 轮换。5. 输出组装：buildEmbeddedRunPayloads(...)。"
+  },
+  {
+    "query_id": "query_105",
+    "user_question": "runEmbeddedAttempt 在退出清理阶段必须执行哪些操作？",
+    "gold_query": "runEmbeddedAttempt 退出清理 必须 finally 执行哪些操作",
+    "gt_answer": "退出清理必须放在 finally 中，包括：unsubscribe()、clearActiveEmbeddedRun(sessionId, queueHandle)、flushPendingToolResultsAfterIdle(...)、session.dispose()。"
+  },
+  {
+    "query_id": "query_106",
+    "user_question": "createEmbeddedPiSessionEventHandler 会分发哪些事件？",
+    "gold_query": "createEmbeddedPiSessionEventHandler 分发哪些事件",
+    "gt_answer": "createEmbeddedPiSessionEventHandler(...) 分发的事件包括：message_start（重置消息级状态）、message_update（增量流处理，如 delta、reasoning、block chunk）、message_end（最终文本/推理输出收敛）、tool_execution_start/update/end（工具事件与摘要）、auto_compaction_start/end（压缩生命周期）、agent_start/agent_end（生命周期事件）。"
+  },
+  {
+    "query_id": "query_107",
+    "user_question": "运行注册表状态机中，clearActiveEmbeddedRun 在什么情况下才会删除 active run？",
+    "gold_query": "clearActiveEmbeddedRun 删除条件 handle 匹配",
+    "gt_answer": "仅当 handle 匹配时才删除，避免误删新 run。"
+  },
+  {
+    "query_id": "query_108",
+    "user_question": "最小复刻代码骨架中，runAgentTurn 函数在 finally 块里做了什么？",
+    "gold_query": "runAgentTurn finally 清理 unregisterActive",
+    "gt_answer": "在 finally 块中调用 unregisterActive(req.sessionId, handle) 进行清理。"
+  },
+  {
+    "query_id": "query_109",
+    "user_question": "开发时如何避免把 run、attempt、subscribe 混在一起？",
+    "gold_query": "开发避坑 run attempt subscribe 混成大函数",
+    "gt_answer": "不要把 run/attempt/subscribe 混成一个大函数。"
+  },
+  {
+    "query_id": "query_110",
+    "user_question": "active run 的注册和清理有什么要求？",
+    "gold_query": "active run 注册 清理 成对 校验 handle",
+    "gt_answer": "active run 必须“注册-清理成对”，而且清理要校验 handle。"
+  },
+  {
+    "query_id": "query_111",
+    "user_question": "工具策略流水线的核心调用是什么，执行顺序有哪几步？",
+    "gold_query": "工具策略流水线 核心调用 执行顺序",
+    "gt_answer": "核心调用在 createOpenClawCodingTools(...)，执行顺序固定为 5 步：Step 1 applyOwnerOnlyToolPolicy(tools, senderIsOwner)；Step 2 applyToolPolicyPipeline(tools, steps)；Step 3 normalized = subagentFiltered.map(normalizeToolParameters)；Step 4 withHooks = normalized.map(wrapToolWithBeforeToolCallHook)；Step 5 withAbort = abortSignal ? withHooks.map(wrapToolWithAbortSignal) : withHooks。"
+  },
+  {
+    "query_id": "query_112",
+    "user_question": "owner-only 裁剪中 senderIsOwner 的默认值是什么？",
+    "gold_query": "owner-only 裁剪 senderIsOwner 默认值",
+    "gt_answer": "默认 false：安全 opt-in，不是 opt-out。代码为：const senderIsOwner = options?.senderIsOwner === true; const toolsByAuthorization = applyOwnerOnlyToolPolicy(tools, senderIsOwner);"
+  },
+  {
+    "query_id": "query_113",
+    "user_question": "buildDefaultToolPolicyPipelineSteps 生成的步骤中，哪些步骤带有 stripPluginOnlyAllowlist: true？",
+    "gold_query": "buildDefaultToolPolicyPipelineSteps stripPluginOnlyAllowlist true 步骤",
+    "gt_answer": "带有 stripPluginOnlyAllowlist: true 的步骤是：`tools.profile (${profile})`、`tools.provider-profile (${profile})` 和 `group tools.allow`。"
+  },
+  {
+    "query_id": "query_114",
+    "user_question": "为什么需要在 pipeline 中进行 schema 规范化？",
+    "gold_query": "schema 规范化 原因 OpenAI 拒绝 根级 union",
+    "gt_answer": "OpenAI 会拒绝根级 union schema（如 `anyOf` 出现在 parameters 根节点）。没有这一步，有些工具在 OpenAI provider 下无声地被服务端拒绝。这一步必须在 Hook 注入之前，因为 wrapToolWithBeforeToolCallHook 会包裹整个 execute。"
+  },
+  {
+    "query_id": "query_115",
+    "user_question": "before_tool_call hook 被阻断时，wrappedTool 的 execute 会怎么处理？",
+    "gold_query": "before_tool_call hook 被阻断时，wrappedTool 的 execute 会怎么处理？",
+    "gt_answer": "如果 outcome.blocked 为 true，会直接 throw new Error(outcome.reason)。"
+  },
+  {
+    "query_id": "query_116",
+    "user_question": "after_tool_call 需要取回 hook 改写后的参数时，参数最终如何获取？",
+    "gold_query": "after_tool_call 需要取回 hook 改写后的参数时，参数最终如何获取？",
+    "gt_answer": "在 pi-tool-definition-adapter.ts 中，如果 beforeHookWrapped 为 true，则 afterParams = consumeAdjustedParamsForToolCall(toolCallId) ?? executeParams；否则 afterParams = executeParams。"
+  },
+  {
+    "query_id": "query_117",
+    "user_question": "after_tool_call 在成功和失败时分别怎么触发？",
+    "gold_query": "after_tool_call 成功路径 失败路径 触发",
+    "gt_answer": "成功路径在 try 块末尾调用 hookRunner.runAfterToolCall({ toolName, params: afterParams, result }, ctx)；失败路径在 catch 块调用 hookRunner.runAfterToolCall({ toolName, params, error: described.message }, ctx)。两条路径均为 fire-and-forget（不 await），Hook 失败只记 debug log，不影响工具结果。"
+  },
+  {
+    "query_id": "query_118",
+    "user_question": "requiresExecApproval 在什么情况下需要人工审批？",
+    "gold_query": "requiresExecApproval 审批判定 规则",
+    "gt_answer": "核心规则：ask === \"always\" || (ask === \"on-miss\" && security === \"allowlist\" && (!analysisOk || !allowlistSatisfied))。即 always 一律审批；on-miss + allowlist 时，分析失败或白名单不满足才审批；其他情况不审批。"
+  },
+  {
+    "query_id": "query_119",
+    "user_question": "awaitDecision(id) 在 entry 不存在时会返回什么？",
+    "gold_query": "awaitDecision entry 不存在 返回",
+    "gt_answer": "返回 `{ error: \"expired or not found\" }`"
+  },
+  {
+    "query_id": "query_120",
+    "user_question": "exec.approval.resolve 中 decision 允许哪些取值？",
+    "gold_query": "exec.approval.resolve decision 允许取值",
+    "gt_answer": "decision 只能是 `allow-once/allow-always/deny`"
+  },
+  {
+    "query_id": "query_121",
+    "user_question": "工具策略管线里 buildAllowedTools 函数的执行步骤有哪些？",
+    "gold_query": "buildAllowedTools 工具策略管线 执行步骤",
+    "gt_answer": "共 5 步：Step 1 owner-only 裁剪（applyOwnerOnlyToolPolicy）；Step 2 多层 pipeline（顺序固定，stripPluginOnlyAllowlist 按步骤开启，依次为 tools.profile、tools.global、tools.agent、group tools.allow、sandbox tools.allow、subagent tools.allow）；Step 3 schema 规范化（必须在 Hook 之前，normalizeToolParameters）；Step 4 Hook 注入（wrapWithBeforeHook）。"
+  },
+  {
+    "query_id": "query_122",
+    "user_question": "审批状态机里的 Decision 类型和 GRACE_MS 是什么？",
+    "gold_query": "审批状态机 Decision 类型 GRACE_MS",
+    "gt_answer": "Decision 类型为 \"allow-once\" | \"allow-always\" | \"deny\" | null；GRACE_MS 为 15_000。Entry 包含 resolve、promise、timer、resolvedAt 字段，pending 为 Map<string, Entry>。"
+  },
+  {
+    "query_id": "query_123",
+    "user_question": "同一审批 id 重复注册会怎样？",
+    "gold_query": "同一审批 id 重复注册会怎样？",
+    "gt_answer": "如果已存在未解决的审批，则返回同一个 promise（幂等）；如果已解决，则抛出错误 'already resolved'。"
+  },
+  {
+    "query_id": "query_124",
+    "user_question": "审批超时后结果是什么？",
+    "gold_query": "审批超时后结果是什么？",
+    "gt_answer": "超时后结果是 null（不是 reject，也不是永远挂起）。"
+  },
+  {
+    "query_id": "query_125",
+    "user_question": "先响应 accepted 再 register 会有什么问题？",
+    "gold_query": "先响应 accepted 再 register 会有什么问题？",
+    "gt_answer": "会导致 race condition：客户端来 waitDecision 时 entry 还未存在。"
+  },
+  {
+    "query_id": "query_126",
+    "user_question": "把审批逻辑塞进工具函数内部有什么缺点？",
+    "gold_query": "把审批逻辑塞进工具函数内部有什么缺点？",
+    "gt_answer": "耦合爆炸，无法独立测试。"
+  },
+  {
+    "query_id": "query_127",
+    "user_question": "OpenClaw 的记忆系统在代码里是怎么分层的？",
+    "gold_query": "OpenClaw 记忆系统 分层 结构",
+    "gt_answer": "OpenClaw 的记忆系统是“两层管理器 + 一层工具”：1. 配置解析层：resolveMemoryBackendConfig(...) 把配置解析成运行时结构（backend/citations/qmd）。2. 管理器层：getMemorySearchManager(...) 先尝试 QmdMemoryManager，失败时自动切到 MemoryIndexManager。3. 工具层：createMemorySearchTool(...) 和 createMemoryGetTool(...) 提供给智能体调用。"
+  },
+  {
+    "query_id": "query_128",
+    "user_question": "getMemorySearchManager 在 backend=qmd 时具体怎么处理？如果 qmd 初始化失败会怎样？",
+    "gold_query": "getMemorySearchManager backend qmd 初始化失败 处理",
+    "gt_answer": "若 backend=qmd：先查 QMD_MANAGER_CACHE（key = buildQmdCacheKey(agentId, qmd)）；未命中则 QmdMemoryManager.create(...)；成功则写入缓存并包一层 FallbackMemoryManager。qmd 初始化失败时：记录 warn，动态 import MemoryIndexManager.get(...) 兜底。兜底也失败：返回 { manager: null, error }，工具层返回 disabled，而不是 throw 崩主流程。"
+  },
+  {
+    "query_id": "query_129",
+    "user_question": "FallbackMemoryManager 的状态机是如何工作的？",
+    "gold_query": "FallbackMemoryManager 状态机 工作流程",
+    "gt_answer": "FallbackMemoryManager 内部有 primaryFailed、fallback、lastError、cacheEvicted 等状态。默认 primaryFailed=false，先走 qmd。当 qmd search 抛错时，primaryFailed=true，关闭 primary，记录 lastError。然后 ensureFallback() 懒加载 builtin manager，后续请求都走 fallback。close() 时回收并调用 evictCacheEntry()。"
+  },
+  {
+    "query_id": "query_130",
+    "user_question": "evictCacheEntry() 有什么作用？",
+    "gold_query": "evictCacheEntry 作用 缓存驱逐",
+    "gt_answer": "evictCacheEntry() 会从 QMD_MANAGER_CACHE 中删除当前条目，并设置 cacheEvicted=true。这样 qmd 失败后主动从缓存删除当前条目，下次 getMemorySearchManager 时会重新尝试创建 qmd，而不是永远复用已失效的实例，实现在线自愈。"
+  },
+  {
+    "query_id": "query_131",
+    "user_question": "memory_search 工具在回答前会强制模型做什么？",
+    "gold_query": "memory_search 强制模型在回答前做什么",
+    "gt_answer": "memory_search 的 'Mandatory recall step' 是设计意图：强迫模型在回答前先做记忆召回，而不是跳过。"
+  },
+  {
+    "query_id": "query_132",
+    "user_question": "memory_get 工具应该在什么时候使用？",
+    "gold_query": "memory_get 工具使用时机",
+    "gt_answer": "memory_get 是 'Safe snippet read'，应在 memory_search 之后使用，用于精确读取片段，控制 token 成本。"
+  },
+  {
+    "query_id": "query_133",
+    "user_question": "qmd backend 的 status() 返回什么？",
+    "gold_query": "qmd backend status() 返回形状",
+    "gt_answer": "qmd backend 的 status() 固定返回：{ backend: \"qmd\", provider: \"qmd\", model: \"qmd\", files: totalDocuments, vector: { enabled: true, available: true } }。"
+  },
+  {
+    "query_id": "query_134",
+    "user_question": "网关启动时的预热机制是什么？",
+    "gold_query": "网关启动预热机制 startGatewayMemoryBackend",
+    "gt_answer": "网关启动时会执行 startGatewayMemoryBackend(...)：1. 只在 backend=qmd 时触发。2. 提前 getMemorySearchManager(...)。3. 调用 probeVectorAvailability() 探测向量后端是否就绪。4. 成功打 info，失败打 warn。作用是把故障提前暴露在启动阶段，而不是第一次用户问答时炸。"
+  },
+  {
+    "query_id": "query_135",
+    "user_question": "FallbackManager 在 search 方法中如何处理主管理器的失败？",
+    "gold_query": "FallbackManager search 主管理器失败 处理",
+    "gt_answer": "在 search 方法中，如果主管理器未失败（!this.failed），会尝试调用 this.primary.search(q, opts)。如果抛出异常，则设置 this.failed = true，调用 this.primary.close?.()，并执行 this.evictCacheEntry()。之后，如果 this.fb 为 null，则通过 await this.createFallback() 创建回退管理器；如果创建失败（this.fb 为 null），则抛出错误 \"memory unavailable\"；否则调用 this.fb.search(q, opts) 并返回结果。"
+  },
+  {
+    "query_id": "query_136",
+    "user_question": "FallbackManager 的 status 方法返回什么？",
+    "gold_query": "FallbackManager status 方法 返回值",
+    "gt_answer": "status 方法返回：如果 this.failed 为 true，则返回 this.fb?.status() ?? { backend: \"unavailable\" }；否则返回 this.primary.status()。"
+  },
+  {
+    "query_id": "query_137",
+    "user_question": "qmd 挂掉后，下一次查询能自动切到 builtin 吗？",
+    "gold_query": "qmd 挂掉后，下一次查询能自动切到 builtin 吗？",
+    "gt_answer": "能。上线验收要求：qmd 挂掉后，下一次查询可自动切 builtin（primaryFailed=true）。"
+  },
+  {
+    "query_id": "query_138",
+    "user_question": "启动时 probeVectorAvailability 有什么作用？",
+    "gold_query": "启动时 probeVectorAvailability 有什么作用？",
+    "gt_answer": "启动时 probeVectorAvailability 能提前暴露向量后端故障。"
+  },
+  {
+    "query_id": "query_139",
+    "user_question": "插件 Hook 的注册阶段有哪些冲突治理规则？",
+    "gold_query": "插件 Hook 注册阶段冲突治理规则",
+    "gt_answer": "registry.ts 内置硬约束：1. registerGatewayMethod 与 core method 或已注册 method 冲突时直接报错诊断；2. registerHttpRoute 路径重复直接报错诊断；3. registerCommand 走 registerPluginCommand(...)，重复命令会拒绝注册。"
+  },
+  {
+    "query_id": "query_140",
+    "user_question": "Hook Runner 的调度规则和故障策略是什么？",
+    "gold_query": "Hook Runner 调度规则 故障策略",
+    "gt_answer": "调度规则：按 hookName 取 handlers（getHooksForName），按 priority 降序排序（高优先级先执行）。故障策略：默认 catchErrors=true，单个 hook 报错只记日志，不打断主流程；若显式关闭 catchErrors，则抛出错误（通常只用于调试）。"
+  },
+  {
+    "query_id": "query_141",
+    "user_question": "hook 的执行顺序是怎么确定的？",
+    "gold_query": "hook 执行顺序 优先级",
+    "gt_answer": "高优先级 hook 先执行。"
+  },
+  {
+    "query_id": "query_142",
+    "user_question": "如果某个 hook 报错了，会导致聊天主链崩溃吗？",
+    "gold_query": "hook 报错 聊天主链 崩溃",
+    "gt_answer": "不会，任一 hook 报错不会导致聊天主链崩溃。"
+  },
+  {
+    "query_id": "query_143",
+    "user_question": "LaneState 有哪些字段？",
+    "gold_query": "LaneState 字段",
+    "gt_answer": "LaneState 的字段包括：lane: string; queue: QueueEntry[]; activeTaskIds: Set<number>; maxConcurrent: number; draining: boolean; generation: number。"
+  },
+  {
+    "query_id": "query_144",
+    "user_question": "双层排队模型是如何实现的？",
+    "gold_query": "双层排队模型 实现",
+    "gt_answer": "双层排队模型通过两层 enqueue 实现：外层是 session 串行（同会话顺序保证），内层是 global 限流（跨会话资源门控）。代码为：await enqueue(sessionLane, () => enqueue(globalLane, task));"
+  },
+  {
+    "query_id": "query_145",
+    "user_question": "resolveSessionLane 函数如何处理传入的 key？",
+    "gold_query": "resolveSessionLane 函数如何处理传入的 key？",
+    "gt_answer": "resolveSessionLane 函数首先对 key 进行 trim 操作，如果清理后为空则回落到 CommandLane.Main。然后检查清理后的 key 是否以 \"session:\" 开头，如果不是则添加 \"session:\" 前缀。该函数是幂等的，已包含前缀的 key 不会重复添加。"
+  },
+  {
+    "query_id": "query_146",
+    "user_question": "drainLane 函数如何防止重入？",
+    "gold_query": "drainLane 函数如何防止重入？",
+    "gt_answer": "drainLane 函数通过检查 state.draining 标志来防止重入：如果 state.draining 为 true，则直接返回，不执行后续逻辑。"
+  },
+  {
+    "query_id": "query_147",
+    "user_question": "clearCommandLane 和 resetAllLanes 有什么区别？",
+    "gold_query": "clearCommandLane resetAllLanes 区别",
+    "gt_answer": "clearCommandLane(lane) 只取消 queue 里未开始的任务，抛 CommandLaneClearedError，不影响已 active 的任务。resetAllLanes() 用于 SIGUSR1 进程内重启后，执行步骤：1. state.generation++，让旧回调回写时发现 generation 不匹配并直接忽略；2. state.activeTaskIds.clear()，强制归零；3. 保留 queue，重新 drainLane，让积压任务继续执行。"
+  },
+  {
+    "query_id": "query_148",
+    "user_question": "waitForActiveTasks 是怎么工作的？",
+    "gold_query": "waitForActiveTasks 工作原理",
+    "gt_answer": "waitForActiveTasks(timeoutMs) 进入时快照 activeAtStart（当前所有 active 任务），每 50ms（POLL_INTERVAL_MS）检查这批 ID 是否都已完成。只等调用时已经 active 的任务，不等后来新进来的任务。返回 { drained: boolean }，超时不 reject。"
+  },
+  {
+    "query_id": "query_149",
+    "user_question": "queueEmbeddedPiMessage 在哪些情况下会返回 false？",
+    "gold_query": "queueEmbeddedPiMessage 返回 false 的场景",
+    "gt_answer": "返回 false 的三种场景：1. no_active_run：sessionId 无活动 run；2. not_streaming：run 存在但 isStreaming=false（还未进入流式阶段）；3. compacting：正在压缩上下文（isCompacting=true），不接受新消息。"
+  },
+  {
+    "query_id": "query_150",
+    "user_question": "clearActiveEmbeddedRun 如何防止旧 finally 块误删新 run？",
+    "gold_query": "clearActiveEmbeddedRun handle 匹配校验 防止误删",
+    "gt_answer": "必须 handle 匹配才删除：if (ACTIVE_EMBEDDED_RUNS.get(sessionId) === handle) { ACTIVE_EMBEDDED_RUNS.delete(sessionId); }，防止“旧 finally 块误删新 run”的竞态。"
+  },
+  {
+    "query_id": "query_151",
+    "user_question": "resetAllLanes 函数在热重启时做了什么？",
+    "gold_query": "resetAllLanes 热重启 实现",
+    "gt_answer": "resetAllLanes 函数遍历所有 lane 状态，将每个状态的 generation 加一，清空 activeTaskIds，然后调用 drainLane 让积压任务继续。"
+  },
+  {
+    "query_id": "query_152",
+    "user_question": "clearActiveRun 不校验 handle 会导致什么问题？",
+    "gold_query": "clearActiveRun handle 校验 问题",
+    "gt_answer": "clearActiveRun 不校验 handle 会误删新任务，在高并发下必现。"
+  },
+  {
+    "query_id": "query_153",
+    "user_question": "这个导航台聚焦哪些 AI 核心实现模块？",
+    "gold_query": "这个导航台聚焦哪些 AI 核心实现模块？",
+    "gt_answer": "上下文管理、状态机、工具策略、回退机制、记忆系统、Hook / 插件框架。"
+  },
+  {
+    "query_id": "query_154",
+    "user_question": "上下文与执行状态机这一模块包含哪些内容？",
+    "gold_query": "上下文与执行状态机这一模块包含哪些内容？",
+    "gt_answer": "包含上下文工程原理、上下文管理实战、智能体执行状态机实战。"
+  },
+  {
+    "query_id": "query_155",
+    "user_question": "记忆、Hook 与插件治理这个板块包含哪些内容？",
+    "gold_query": "记忆、Hook 与插件治理板块内容",
+    "gt_answer": "该板块旨在打造可扩展但不失控的工程结构，处理多插件冲突与优先级。包含以下链接：AI 记忆框架原理、记忆状态机实战、Hook 与插件注入原理、Hook 注入状态机实战、多插件冲突治理实战。"
+  },
+  {
+    "query_id": "query_156",
+    "user_question": "并发队列实战板块主要讲什么？",
+    "gold_query": "并发队列实战板块内容",
+    "gt_answer": "并发队列实战板块主要讲解 session/global 双层排队、reset 恢复与 active run 注册表的并发底座，包含链接：并发队列与 Lane 状态机实战。"
+  },
+  {
+    "query_id": "query_157",
+    "user_question": "OpenClaw 重点框架专项剖析里包含哪些核心框架？",
+    "gold_query": "OpenClaw 重点框架专项剖析 核心框架",
+    "gt_answer": "包含五个核心框架：框架1上下文工程、框架2执行状态机、框架3工具策略与审批、框架4回退与鲁棒性、框架5记忆系统。"
+  },
+  {
+    "query_id": "query_158",
+    "user_question": "框架2执行状态机主要拆解什么？保障哪些特性？",
+    "gold_query": "框架2 执行状态机 拆解 run attempt subscribe runs 保障",
+    "gt_answer": "框架2执行状态机拆解 run/attempt/subscribe/runs，保障可中断、可恢复、可观测。"
+  },
+  {
+    "query_id": "query_159",
+    "user_question": "框架 6 是什么？它实现哪些功能？",
+    "gold_query": "框架 6 Hook 与插件治理 实现功能",
+    "gt_answer": "框架 6 是 Hook 与插件治理，实现可扩展注入点、优先级调度、冲突治理和故障隔离。"
+  },
+  {
+    "query_id": "query_160",
+    "user_question": "建议优先级中第一优先和第二优先分别是哪些章节？",
+    "gold_query": "建议优先级 第一优先 第二优先 章节",
+    "gt_answer": "第一优先：16、17、18、19、20；第二优先：08、09、10、13、14、15。"
+  }
+]

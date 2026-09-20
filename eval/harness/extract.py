@@ -30,7 +30,7 @@ _THINK_ACTION_FENCE = re.compile(
 
 
 def load_gold(path: Path | None = None) -> list[GoldSample]:
-    """Load ``list[GoldSample]`` from ``eval/data/gold/samples.json`` (or *path*)."""
+    """Load ``list[GoldSample]`` from the default gold JSON (or *path*)."""
     target = path or gold_path()
     payload = json.loads(target.read_text(encoding="utf-8"))
     if not isinstance(payload, list):
@@ -55,9 +55,8 @@ def extract_runner(
         artifact = json.loads(path.read_text(encoding="utf-8"))
         query_id = str(artifact.get("query_id") or path.stem)
         if query_id not in gold_by_id:
-            raise KeyError(
-                f"No gold row for query_id={query_id!r} (artifact {path})"
-            )
+            print(f"extract skip {path.name}: not in gold", flush=True)
+            continue
         gold_row = gold_by_id[query_id]
         if mode == "agent":
             results.append(
@@ -177,14 +176,13 @@ def rag_artifact_to_checker_sample(
 
 if __name__ == "__main__":
     from eval.harness.paths import ensure_data_dirs
+    from eval.harness.runners import DEFAULT_RUNNERS
 
     ensure_data_dirs()
     gold = load_gold()
-    runners: list[tuple[str, Literal["agent", "rag"]]] = [
-        ("agent_self_rag_hyde", "agent"),
-        ("rag_rerank_hyde", "rag"),
-    ]
-    for runner_id, mode in runners:
+    for runner in DEFAULT_RUNNERS:
+        runner_id = runner["runner_id"]
+        mode = runner["mode"]
         checker_input = extract_runner(runner_id, gold, mode=mode)
         out = write_checker_input(runner_id, checker_input)
         print(

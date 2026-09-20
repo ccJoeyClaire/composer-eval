@@ -1,4 +1,4 @@
-"""On-disk layout for the eval harness (under ``eval/data/``)."""
+"""On-disk layout: ``gold/`` (tracked), ``data/`` (runtime), ``corpus/``, ``demo/``."""
 
 from __future__ import annotations
 
@@ -9,24 +9,25 @@ CONFIG_DIR = REPO_ROOT / "config"
 RAG_CONFIG_PATH = CONFIG_DIR / "arg_config.yaml"
 AGENT_CONFIG_PATH = CONFIG_DIR / "agent_arg_config.yaml"
 
-EVAL_ROOT = Path(__file__).resolve().parents[1]
-DATA_ROOT = EVAL_ROOT / "data"
-
-GOLD_DIR = DATA_ROOT / "gold"
-QA_EXPORTS_DIR = DATA_ROOT / "qa_exports"
+GOLD_DIR = REPO_ROOT / "gold"
+QA_EXPORTS_DIR = GOLD_DIR / "qa_exports"
+DATA_ROOT = REPO_ROOT / "data"
 INFER_DIR = DATA_ROOT / "infer"
 RAGCHECKER_DIR = DATA_ROOT / "ragchecker"
+DOC4RAG_DIR = REPO_ROOT / "corpus" / "doc4RAG"
+DEMO_DIR = REPO_ROOT / "demo"
 
 DEFAULT_QA_EXPORT = "eval-datasets-1783174091039.json"
+DEFAULT_GOLD = "openclaw_docs_qa.json"
 
 
-def gold_path(name: str = "samples.json") -> Path:
-    """QA generator output: ``list[GoldSample]``."""
+def gold_path(name: str = DEFAULT_GOLD) -> Path:
+    """QA generator output: ``list[GoldSample]`` under ``gold/``."""
     return GOLD_DIR / name
 
 
 def qa_export_path(name: str = DEFAULT_QA_EXPORT) -> Path:
-    """Easy Dataset JSON export under ``eval/data/qa_exports/``."""
+    """Easy Dataset JSON export under ``gold/qa_exports/``."""
     return QA_EXPORTS_DIR / name
 
 
@@ -66,6 +67,6 @@ def ragchecker_llm_snapshot_path(runner_id: str) -> Path:
 
 
 def ensure_data_dirs() -> None:
-    """Create artifact directories if missing."""
-    for path in (GOLD_DIR, INFER_DIR, RAGCHECKER_DIR):
+    """Create runtime artifact directories under ``data/`` if missing."""
+    for path in (INFER_DIR, RAGCHECKER_DIR):
         path.mkdir(parents=True, exist_ok=True)

@@ -191,7 +191,7 @@ def run_checker_for_runner(
     runner_id: str,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """Score ``eval/data/ragchecker/{runner_id}/input.json``."""
+    """Score ``data/ragchecker/{runner_id}/input.json``."""
     return run_checker(
         input_path=ragchecker_input_path(runner_id),
         output_path=ragchecker_scores_path(runner_id),
@@ -222,14 +222,14 @@ def main(argv: Sequence[str] | None = None) -> None:
         action="append",
         dest="runners",
         help=(
-            "runner_id under eval/data/ragchecker/ "
+            "runner_id under data/ragchecker/ "
             f"(repeatable; default: {DEFAULT_RUNNER})"
         ),
     )
     parser.add_argument(
         "--all-runners",
         action="store_true",
-        help="Score every eval/data/ragchecker/*/input.json",
+        help="Score every data/ragchecker/*/input.json",
     )
     parser.add_argument(
         "--input",

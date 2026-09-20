@@ -34,6 +34,7 @@ class AgentArmConfig(TypedDict, total=False):
 
     pattern_id: str
     profile_id: str
+    index_profile_id: str
     enable_web_search: bool
 
 

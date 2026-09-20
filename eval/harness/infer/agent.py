@@ -7,6 +7,10 @@ import json
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+load_dotenv(_REPO_ROOT / ".env", override=True)
+
 from langchain_core.messages import HumanMessage
 
 from agent.output import OutputState
@@ -14,9 +18,6 @@ from agent.pattern.common import RequestConfig, build_run
 from eval.base import AgentInferArtifact, EvalRunner, GoldSample
 from eval.harness.extract import strip_think_action_fences
 from eval.harness.paths import AGENT_CONFIG_PATH
-
-_GETSTART_COLLECTION_PREFIX = "getstart_codex_"
-_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 async def run_agent_infer(
@@ -32,13 +33,9 @@ async def run_agent_infer(
     """
     agent_cfg = runner["agent_config"]
     collection = runner["collection"]
-    prefix = _GETSTART_COLLECTION_PREFIX
-    if not collection.startswith(prefix):
-        raise ValueError(
-            f"collection {collection!r} must start with {prefix!r} "
-            "to derive index_profile_id"
-        )
-    index_profile_id = collection[len(prefix) :]
+    index_profile_id = str(agent_cfg.get("index_profile_id") or "").strip()
+    if not index_profile_id:
+        raise ValueError("runner.agent_config.index_profile_id is required")
 
     request_config = RequestConfig(
         pattern_id=str(agent_cfg.get("pattern_id", "")),
@@ -88,22 +85,9 @@ async def run_agent_infer(
 if __name__ == "__main__":
     from eval.harness.extract import load_gold
     from eval.harness.paths import agent_infer_path, ensure_data_dirs
+    from eval.harness.runners import resolve_runners
 
-    runner = EvalRunner(
-        runner_id="agent_self_rag_hyde",
-        mode="agent",
-        collection="getstart_codex_baseline",
-        agent_config={
-            "pattern_id": "self_rag",
-            "profile_id": "rerank_hyde",
-            "enable_web_search": False,
-        },
-        rag_config={
-            "profile_id": "rerank_hyde",
-            "top_k": 10,
-        },
-    )
-    load_dotenv(_REPO_ROOT / ".env")
+    runner = resolve_runners(["agent_self_rag_baseline_hyde"])[0]
     ensure_data_dirs()
     gold_samples = load_gold()
     artifacts = asyncio.run(run_agent_infer(runner, gold_samples))
